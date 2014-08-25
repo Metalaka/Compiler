@@ -102,6 +102,12 @@ abstract class Sampler {
      */
     protected $_currentNamespace = 'default';
 
+    /**
+     * Skip token.
+     *
+     * @var \Hoa\Compiler\Llk\Sampler array
+     */
+    protected $_skipToken        = array();
 
 
     /**
@@ -125,10 +131,40 @@ abstract class Sampler {
     }
 
     /**
+     * Format the skip token.
+     *
+     * @access  protected
+     * @return  string
+     */
+    protected function getSkipToken ( ) {
+
+        if (isset($this->_skipToken[$this->_currentNamespace]))
+            return $this->_skipToken[$this->_currentNamespace];
+
+        if(!isset($this->_tokens[$this->_currentNamespace]['skip']))
+            return $this->_skipToken[$this->_currentNamespace] = '';
+
+        $token = new \Hoa\Compiler\Llk\Rule\Token(
+            -1,
+            'skip',
+            null,
+            -1
+        );
+        $token->setRepresentation(
+            $this->_tokens[$this->_currentNamespace]['skip']
+        );
+
+        $this->_skipToken[$this->_currentNamespace] = $this->_tokenSampler
+             ->visit($token->getAST());
+
+        return $this->_skipToken[$this->_currentNamespace];
+    }
+
+    /**
      * Complete a token (namespace and representation).
      * It returns the next namespace.
      *
-     * @access  public
+     * @access  protected
      * @param   \Hoa\Compiler\Llk\Rule\Token  $token    Token.
      * @return  string
      */
@@ -169,7 +205,7 @@ abstract class Sampler {
     /**
      * Set current token namespace.
      *
-     * @access  public
+     * @access  protected
      * @param   string  $namespace    Token namespace.
      * @return  string
      */
@@ -196,7 +232,7 @@ abstract class Sampler {
 
         return $this->_tokenSampler->visit(
             $token->getAST()
-        ) . ' '; // use skip token @TODO
+        ) . $this->getSkipToken();
     }
 }
 
