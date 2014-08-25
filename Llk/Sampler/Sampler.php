@@ -102,6 +102,12 @@ abstract class Sampler {
      */
     protected $_currentNamespace = 'default';
 
+    /**
+     * Skip token.
+     *
+     * @var \Hoa\Compiler\Llk\Sampler string
+     */
+    protected $_skipToken        = null;
 
 
     /**
@@ -120,15 +126,80 @@ abstract class Sampler {
         $this->_rules        = $compiler->getRules();
         $this->_tokenSampler = $tokenSampler;
         $this->_rootRuleName = $compiler->getRootRule();
+        $this->_skipToken    = $this->formatSkipToken();
 
         return;
+    }
+
+    /**
+     * Format the skip token.
+     *
+     * @access  protected
+     * @return  string
+     */
+    protected function formatSkipToken ( ) {
+
+        $value = $this->_tokens['default']['skip'];
+
+        if ('\\' == $value[0])
+            switch ($value[1]) {
+                case 'h': // any horizontal white space character
+                    return chr(0x0009); // TAB
+
+                case 's': // any white space character
+                    /**
+                     * @help http://pcre.org/pcre.txt
+                     *
+                     * The default \s characters are:
+                     * HT    (9),
+                     * LF    (10),
+                     * VT    (11),
+                     * FF    (12),
+                     * CR    (13),
+                     * space (32),
+                     */
+                    return chr(0x0020); // Space
+
+                case 'c': // \cx       where x is any ASCII character
+                    return substr($value, 1);
+
+                case 'o': // \o{ddd..} character with octal code ddd..
+                case '0': // \0dd      character with octal code 0dd
+                    if ('{' == $this->_skipToken[2])
+                        return \Hoa\String::fromCode(octdec(
+                            substr($value, 3, -1)
+                        ));
+                    return \Hoa\String::fromCode(octdec(
+                        substr($value, 2)
+                    ));
+
+                case 'x': // \x{hhh..} character with hex code hhh.. (non-JavaScript mode)
+                          // \xhh      character with hex code hh
+                case 'u': // \uhhhh    character with hex code hhhh (JavaScript mode only)
+                    if ('{' == $this->_skipToken[2])
+                        return \Hoa\String::fromCode(hexdec(
+                            substr($value, 3, -1)
+                        ));
+                    return \Hoa\String::fromCode(hexdec(
+                        substr($value, 2)
+                    ));
+
+                default:  // \ddd      character with octal code ddd
+                    if (preg_match('/\\\\[0-7]{2,}/', $this->_skipToken))
+                        return \Hoa\String::fromCode(octdec(
+                            substr($value, 1)
+                        ));
+                    return stripcslashes($this->_skipToken);
+            }
+
+        return $value;
     }
 
     /**
      * Complete a token (namespace and representation).
      * It returns the next namespace.
      *
-     * @access  public
+     * @access  protected
      * @param   \Hoa\Compiler\Llk\Rule\Token  $token    Token.
      * @return  string
      */
@@ -169,7 +240,7 @@ abstract class Sampler {
     /**
      * Set current token namespace.
      *
-     * @access  public
+     * @access  protected
      * @param   string  $namespace    Token namespace.
      * @return  string
      */
@@ -196,7 +267,7 @@ abstract class Sampler {
 
         return $this->_tokenSampler->visit(
             $token->getAST()
-        ) . ' '; // use skip token @TODO
+        ) . $this->_skipToken;
     }
 }
 
